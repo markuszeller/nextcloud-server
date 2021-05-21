@@ -67,6 +67,7 @@ use OCA\DAV\Files\BrowserErrorPagePlugin;
 use OCA\DAV\Files\LazySearchBackend;
 use OCA\DAV\Profiler\ProfilerPlugin;
 use OCA\DAV\Provisioning\Apple\AppleProvisioningPlugin;
+use OCA\DAV\Service\CustomPropertiesService;
 use OCA\DAV\SystemTag\SystemTagPlugin;
 use OCA\DAV\Upload\ChunkingPlugin;
 use OCP\AppFramework\Http\Response;
@@ -261,6 +262,7 @@ class Server {
 						new CustomPropertiesBackend(
 							$this->server->tree,
 							\OC::$server->getDatabaseConnection(),
+							\OC::$server->get(CustomPropertiesService::class),
 							\OC::$server->getUserSession()->getUser()
 						)
 					)

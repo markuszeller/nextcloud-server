@@ -281,6 +281,7 @@ return array(
     'OCA\\DAV\\Search\\EventsSearchProvider' => $baseDir . '/../lib/Search/EventsSearchProvider.php',
     'OCA\\DAV\\Search\\TasksSearchProvider' => $baseDir . '/../lib/Search/TasksSearchProvider.php',
     'OCA\\DAV\\Server' => $baseDir . '/../lib/Server.php',
+    'OCA\\DAV\\Service\\CustomPropertiesService' => $baseDir . '/../lib/Service/CustomPropertiesService.php',
     'OCA\\DAV\\Settings\\AvailabilitySettings' => $baseDir . '/../lib/Settings/AvailabilitySettings.php',
     'OCA\\DAV\\Settings\\CalDAVSettings' => $baseDir . '/../lib/Settings/CalDAVSettings.php',
     'OCA\\DAV\\Storage\\PublicOwnerWrapper' => $baseDir . '/../lib/Storage/PublicOwnerWrapper.php',
