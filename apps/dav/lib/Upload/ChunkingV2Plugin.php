@@ -25,8 +25,10 @@ declare(strict_types=1);
 
 namespace OCA\DAV\Upload;
 
+use OC\Files\ObjectStore\ObjectStoreStorage;
 use OC\Files\View;
 use OCA\DAV\Connector\Sabre\Directory;
+use OCA\DAV\Connector\Sabre\FilesPlugin;
 use OCP\Files\Storage\IChunkedFileWrite;
 use OCP\Files\Storage\IStorage;
 use OCP\Files\StorageInvalidException;
@@ -35,6 +37,8 @@ use Sabre\DAV\Exception\NotFound;
 use Sabre\DAV\Exception\PreconditionFailed;
 use Sabre\DAV\Server;
 use Sabre\DAV\ServerPlugin;
+use Sabre\DAV\Xml\Element\Response;
+use Sabre\DAV\Xml\Response\MultiStatus;
 use Sabre\HTTP\RequestInterface;
 use Sabre\HTTP\ResponseInterface;
 use Sabre\Uri;
@@ -144,7 +148,7 @@ class ChunkingV2Plugin extends ServerPlugin {
 		$this->uploadFolder = $this->server->tree->getNodeForPath(dirname($sourcePath));
 		try {
 			$this->checkPrerequisites();
-			$this->getStorage();
+			$storage = $this->getStorage();
 		} catch (StorageInvalidException | BadRequest $e) {
 			return true;
 		}
@@ -162,25 +166,51 @@ class ChunkingV2Plugin extends ServerPlugin {
 		$destinationParent = $this->server->tree->getNodeForPath($destinationDir);
 		$destinationExists = $destinationParent->childExists($destinationName);
 
+		// Using a multipart status here in order to be able to sent the actual status after processing the move
+		$this->server->httpResponse->setStatus(207);
+		$this->server->httpResponse->setHeader('Content-Type', 'application/xml; charset=utf-8');
+
 		$rootView = new View();
-		$rootView->writeChunkedFile($targetFile->getAbsoluteInternalPath(), $uploadId);
-		if (!$destinationExists) {
+		if ($storage->instanceOfStorage(ObjectStoreStorage::class)) {
+			$lastTick = time();
+			$storage->processingCallback('writeChunkedFile', function () use ($lastTick) {
+				if ($lastTick < time()) {
+					\OC_Util::obEnd();
+					echo ' ';
+					flush();
+				}
+				$lastTick = time();
+			});
+		}
+
+		$this->server->httpResponse->setBody(function () use ($targetFile, $rootView, $uploadId, $destinationName, $destinationParent, $destinationExists, $sourcePath, $destination) {
+			$rootView->writeChunkedFile($targetFile->getAbsoluteInternalPath(), $uploadId);
 			$destinationInView = $destinationParent->getFileInfo()->getPath() . '/' . $destinationName;
-			$rootView->rename($targetFile->getAbsoluteInternalPath(), $destinationInView);
-		}
+			if (!$destinationExists) {
+				$rootView->rename($targetFile->getAbsoluteInternalPath(), $destinationInView);
+			}
 
-		$sourceNode = $this->server->tree->getNodeForPath($sourcePath);
-		if ($sourceNode instanceof FutureFile) {
-			$this->uploadFolder->delete();
-		}
+			$sourceNode = $this->server->tree->getNodeForPath($sourcePath);
+			if ($sourceNode instanceof FutureFile) {
+				$this->uploadFolder->delete();
+			}
 
-		$this->server->emit('afterMove', [$sourcePath, $destination]);
-		$this->server->emit('afterUnbind', [$sourcePath]);
-		$this->server->emit('afterBind', [$destination]);
+			$this->server->emit('afterMove', [$sourcePath, $destination]);
+			$this->server->emit('afterUnbind', [$sourcePath]);
+			$this->server->emit('afterBind', [$destination]);
 
-		$response = $this->server->httpResponse;
-		$response->setHeader('Content-Length', '0');
-		$response->setStatus($destinationExists ? 204 : 201);
+			$response = new Response(
+				$destination,
+				['200' => [
+					FilesPlugin::SIZE_PROPERTYNAME => $rootView->filesize($destinationInView)
+				]],
+				$destinationExists ? 204 : 201
+			);
+			echo $this->server->xml->write(
+				'{DAV:}multistatus',
+				new MultiStatus([$response])
+			);
+		});
 		return false;
 	}
 

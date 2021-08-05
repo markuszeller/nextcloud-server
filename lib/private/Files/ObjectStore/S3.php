@@ -68,12 +68,21 @@ class S3 implements IObjectStore, IObjectStoreMultiPartUpload {
 		]);
 	}
 
-	public function completeMultipartUpload(string $urn, string $uploadId, array $result): int {
+	public function completeMultipartUpload(string $urn, string $uploadId, array $result, callable $processingCallback = null): int {
 		$this->getConnection()->completeMultipartUpload([
 			'Bucket' => $this->bucket,
 			'Key' => $urn,
 			'UploadId' => $uploadId,
 			'MultipartUpload' => ['Parts' => $result],
+			'@http' => [
+				// the progress callback is called by CURLOPT_PROGRESSFUNCTION which would get called regularly
+				// https://curl.se/libcurl/c/CURLOPT_PROGRESSFUNCTION.html
+				'progress' => function (/* $downloadTotalSize, $downloadSizeSoFar, $uploadTotalSize, $uploadSizeSoFar */) use ($processingCallback) {
+					if ($processingCallback) {
+						$processingCallback();
+					}
+				}
+			]
 		]);
 		$stat = $this->getConnection()->headObject([
 			'Bucket' => $this->bucket,

@@ -72,6 +72,9 @@ class ObjectStoreStorage extends \OC\Files\Storage\Common implements IChunkedFil
 	/** @var ICache */
 	private $uploadCache;
 
+	/** @var array */
+	private $processingCallbacks;
+
 	public function __construct($params) {
 		if (isset($params['objectstore']) && $params['objectstore'] instanceof IObjectStore) {
 			$this->objectStore = $params['objectstore'];
@@ -663,6 +666,17 @@ class ObjectStoreStorage extends \OC\Files\Storage\Common implements IChunkedFil
 		$this->uploadCache->set($this->getUploadCacheKey($urn, $uploadId, 'parts'), $parts);
 	}
 
+	public function processingCallback(string $method, callable $callback) {
+		if (in_array($method, ['writeChunkedFile'])) {
+			if (!isset($this->processingCallbacks[$method])) {
+				$this->processingCallbacks[$method] = [];
+			}
+			$this->processingCallbacks[$method][] = $callback;
+			return;
+		}
+		throw new \Exception('Invalid handler method for processing callback');
+	}
+
 	public function writeChunkedFile(string $targetPath, string $writeToken): int {
 		$this->validateUploadCache();
 		if (!$this->objectStore instanceof IObjectStoreMultiPartUpload) {
@@ -673,7 +687,15 @@ class ObjectStoreStorage extends \OC\Files\Storage\Common implements IChunkedFil
 		$uploadId = $this->uploadCache->get($this->getUploadCacheKey($urn, $writeToken, 'uploadId'));
 		$parts = $this->uploadCache->get($this->getUploadCacheKey($urn, $uploadId, 'parts'));
 		try {
-			$size = $this->objectStore->completeMultipartUpload($urn, $uploadId, array_values($parts));
+			if ($this->objectStore instanceof S3) {
+				$size = $this->objectStore->completeMultipartUpload($urn, $uploadId, array_values($parts), function () {
+					foreach ($this->processingCallbacks['writeChunkedFile'] as $callback) {
+						$callback();
+					}
+				});
+			} else {
+				$size = $this->objectStore->completeMultipartUpload($urn, $uploadId, array_values($parts));
+			}
 			$stat = $this->stat($targetPath);
 			$mtime = time();
 			if (is_array($stat)) {
