@@ -35,6 +35,7 @@ class CapabilitiesTest extends TestCase {
 		$expected = [
 			'dav' => [
 				'chunking' => '1.0',
+				's3-multipart' => true,
 				// disabled because of https://github.com/nextcloud/desktop/issues/4243
 				// 'bulkupload' => '1.0',
 			],
