@@ -686,9 +686,11 @@ class ObjectStoreStorage extends \OC\Files\Storage\Common implements IChunkedFil
 		$urn = $this->getURN($cacheEntry->getId());
 		$uploadId = $this->uploadCache->get($this->getUploadCacheKey($urn, $writeToken, 'uploadId'));
 		$parts = $this->uploadCache->get($this->getUploadCacheKey($urn, $uploadId, 'parts'));
+		$sortedParts = array_values($parts);
+		sort($sortedParts);
 		try {
 			if ($this->objectStore instanceof S3) {
-				$size = $this->objectStore->completeMultipartUpload($urn, $uploadId, array_values($parts), function () {
+				$size = $this->objectStore->completeMultipartUpload($urn, $uploadId, $sortedParts, function () {
 					foreach ($this->processingCallbacks['writeChunkedFile'] as $callback) {
 						$callback();
 					}

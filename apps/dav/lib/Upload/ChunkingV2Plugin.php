@@ -33,6 +33,7 @@ use OCP\Files\Storage\IChunkedFileWrite;
 use OCP\Files\Storage\IStorage;
 use OCP\Files\StorageInvalidException;
 use Sabre\DAV\Exception\BadRequest;
+use Sabre\DAV\Exception\InsufficientStorage;
 use Sabre\DAV\Exception\NotFound;
 use Sabre\DAV\Exception\PreconditionFailed;
 use Sabre\DAV\Server;
@@ -137,8 +138,33 @@ class ChunkingV2Plugin extends ServerPlugin {
 		}
 
 		$targetFile = $this->getTargetFile($targetPath);
+		$cacheEntry = $storage->getCache()->get($targetFile->getInternalPath());
+		$tempTargetFile = null;
+
+		$additionalSize = (int)$request->getHeader('Content-Length');
+		if ($this->uploadFolder->childExists(self::TEMP_TARGET)) {
+			// FIXME Quota checking will not work for existing files that way
+			$tempTargetFile = $this->uploadFolder->getChild(self::TEMP_TARGET);
+			$tempTargetCache = $storage->getCache()->get($tempTargetFile->getInternalPath());
+
+			[$destinationDir, $destinationName] = Uri\split($targetPath);
+			/** @var Directory $destinationParent */
+			$destinationParent = $this->server->tree->getNodeForPath($destinationDir);
+			$free = $storage->free_space($destinationParent->getInternalPath());
+			$newSize = $tempTargetCache->getSize() + $additionalSize;
+			if ($free >= 0 && ($tempTargetCache->getSize() > $free || $newSize > $free)) {
+				throw new InsufficientStorage("Insufficient space in $targetPath");
+			}
+		}
+
 		$stream = $request->getBodyAsStream();
-		$storage->putChunkedFilePart($targetFile->getInternalPath(), $uploadId, (string)$partId, $stream, (int)$request->getHeader('Content-Length'));
+		$storage->putChunkedFilePart($targetFile->getInternalPath(), $uploadId, (string)$partId, $stream, $additionalSize);
+		// FIXME add return value to putChunkedFilePart to validate against size
+
+		$storage->getCache()->update($cacheEntry->getId(), ['size' => $cacheEntry->getSize() + $additionalSize]);
+		if ($tempTargetFile) {
+			$storage->getPropagator()->propagateChange($tempTargetFile->getInternalPath(), time(), $additionalSize);
+		}
 
 		$response->setStatus(201);
 		return false;
@@ -155,6 +181,8 @@ class ChunkingV2Plugin extends ServerPlugin {
 		$properties = $this->server->getProperties(dirname($sourcePath) . '/', [ self::OBJECT_UPLOAD_CHUNKTOKEN, self::OBJECT_UPLOAD_TARGET ]);
 		$targetPath = $properties[self::OBJECT_UPLOAD_TARGET];
 		$uploadId = $properties[self::OBJECT_UPLOAD_CHUNKTOKEN];
+
+		// FIXME: check if $destination === TARGET
 		if (empty($targetPath) || empty($uploadId)) {
 			throw new PreconditionFailed('Missing metadata for chunked upload');
 		}
