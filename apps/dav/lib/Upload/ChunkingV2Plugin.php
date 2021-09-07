@@ -108,6 +108,8 @@ class ChunkingV2Plugin extends ServerPlugin {
 			return true;
 		}
 
+		$targetPath = $this->server->calculateUri($targetPath);
+
 		$targetFile = $this->getTargetFile($targetPath, true);
 
 		$uploadId = $storage->beginChunkedFile($targetFile->getInternalPath());

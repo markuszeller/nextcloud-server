@@ -741,7 +741,7 @@ import escapeHTML from 'escape-html'
 			return promise
 		},
 
-		_simpleCall: function(method, path) {
+		_simpleCall: function(method, path, headers) {
 			if (!path) {
 				throw 'Missing argument "path"'
 			}
@@ -752,7 +752,8 @@ import escapeHTML from 'escape-html'
 
 			this._client.request(
 				method,
-				this._buildUrl(path)
+				this._buildUrl(path),
+				headers ? headers : {}
 			).then(
 				function(result) {
 					if (self._isSuccessStatus(result.status)) {
@@ -773,8 +774,8 @@ import escapeHTML from 'escape-html'
 		 *
 		 * @returns {Promise}
 		 */
-		createDirectory: function(path) {
-			return this._simpleCall('MKCOL', path)
+		createDirectory: function(path, headers) {
+			return this._simpleCall('MKCOL', path, headers)
 		},
 
 		/**
