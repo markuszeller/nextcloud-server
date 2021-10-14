@@ -868,6 +868,9 @@
     </RedundantFunctionCall>
   </file>
   <file src="apps/dav/lib/Upload/ChunkingV2Plugin.php">
+    <TooManyArguments occurrences="1">
+      <code>propagateChange</code>
+    </TooManyArguments>
     <UndefinedFunction occurrences="2">
       <code>Uri\split($destination)</code>
       <code>Uri\split($targetPath)</code>

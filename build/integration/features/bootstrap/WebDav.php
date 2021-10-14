@@ -54,6 +54,9 @@ trait WebDav {
 	/** @var int */
 	private $storedFileID = null;
 
+	private string $s3MultipartDestination;
+	private string $uploadId;
+
 	/**
 	 * @Given /^using dav path "([^"]*)"$/
 	 */
@@ -646,6 +649,7 @@ trait WebDav {
 	 * @Given user :user creates a new chunking upload with id :id
 	 */
 	public function userCreatesANewChunkingUploadWithId($user, $id) {
+		$this->parts = [];
 		$destination = '/uploads/' . $user . '/' . $id;
 		$this->makeDavRequest($user, 'MKCOL', $destination, [], null, "uploads");
 	}
@@ -689,28 +693,30 @@ trait WebDav {
 
 
 	/**
-	 * @Given user :user creates a new chunking v2 upload with id :id and destionation :targetDestination
+	 * @Given user :user creates a new chunking v2 upload with id :id and destination :targetDestination
 	 */
 	public function userCreatesANewChunkingv2UploadWithIdAndDestination($user, $id, $targetDestination) {
-		$destination = '/uploads/' . $user . '/' . $id;
+		$this->s3MultipartDestination = $this->getTargetDestination($user, $targetDestination);
+		$this->newUploadId();
+		$destination = '/uploads/' . $user . '/' . $this->getUploadId($id);
 		$this->makeDavRequest($user, 'MKCOL', $destination, [
 			'X-S3-Multipart-Destination' => $this->s3MultipartDestination,
 		], null, "uploads");
 	}
 
 	/**
-	 * @Given user :user uploads new chunk v2 file :num with :data to id :id and destionation :targetDestination
+	 * @Given user :user uploads new chunk v2 file :num to id :id
 	 */
-	public function userUploadsNewChunkv2FileOfWithToIdAndDestination($user, $num, $data, $id, $targetDestination) {
-		$data = \GuzzleHttp\Psr7\stream_for($data);
-		$destination = '/uploads/' . $user . '/' . $id . '/' . $num;
+	public function userUploadsNewChunkv2FileToIdAndDestination($user, $num, $id) {
+		$data = \GuzzleHttp\Psr7\Utils::streamFor(fopen('/tmp/part-upload-' . $num, 'r'));
+		$destination = '/uploads/' . $user . '/' . $this->getUploadId($id) . '/' . $num;
 		$this->makeDavRequest($user, 'PUT', $destination, [
 			'X-S3-Multipart-Destination' => $this->s3MultipartDestination
 		], $data, "uploads");
 	}
 
 	/**
-	 * @Given user :user moves new chunk v2 file with id :id to :dest
+	 * @Given user :user moves new chunk v2 file with id :id
 	 */
 	public function userMovesNewChunkv2FileWithIdToMychunkedfileAndDestination($user, $id) {
 		$source = '/uploads/' . $user . '/' . $this->getUploadId($id) . '/.file';
@@ -934,12 +940,20 @@ trait WebDav {
 	 */
 	public function userCreatesAFileLocallyWithChunks($arg1, $chunks) {
 		$this->parts = [];
-		for ($i=0;$i<(int)$chunks;$i++) {
+		for ($i = 1;$i <= (int)$chunks;$i++) {
 			$randomletter = substr(str_shuffle("abcdefghijklmnopqrstuvwxyz"), 0, 1);
 			file_put_contents('/tmp/part-upload-' . $i, str_repeat($randomletter, 5 * 1024 * 1024));
 			$this->parts[] = '/tmp/part-upload-' . $i;
 		}
+	}
 
+	/**
+	 * @Given user :user creates the chunk :id with a size of :size MB
+	 */
+	public function userCreatesAChunk($user, $id, $size) {
+		$randomletter = substr(str_shuffle("abcdefghijklmnopqrstuvwxyz"), 0, 1);
+		file_put_contents('/tmp/part-upload-' . $id, str_repeat($randomletter, (int)$size * 1024 * 1024));
+		$this->parts[] = '/tmp/part-upload-' . $id;
 	}
 
 	/**
@@ -947,6 +961,7 @@ trait WebDav {
 	 */
 	public function downloadedContentShouldBeTheCreatedFile() {
 		$content = '';
+		sort($this->parts);
 		foreach ($this->parts as $part) {
 			$content .= file_get_contents($part);
 		}
