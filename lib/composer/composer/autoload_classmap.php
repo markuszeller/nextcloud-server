@@ -340,6 +340,7 @@ return array(
     'OCP\\Files\\Storage\\IDisableEncryptionStorage' => $baseDir . '/lib/public/Files/Storage/IDisableEncryptionStorage.php',
     'OCP\\Files\\Storage\\ILockingStorage' => $baseDir . '/lib/public/Files/Storage/ILockingStorage.php',
     'OCP\\Files\\Storage\\INotifyStorage' => $baseDir . '/lib/public/Files/Storage/INotifyStorage.php',
+    'OCP\\Files\\Storage\\IProcessingCallbackStorage' => $baseDir . '/lib/public/Files/Storage/IProcessingCallbackStorage.php',
     'OCP\\Files\\Storage\\IReliableEtagStorage' => $baseDir . '/lib/public/Files/Storage/IReliableEtagStorage.php',
     'OCP\\Files\\Storage\\IStorage' => $baseDir . '/lib/public/Files/Storage/IStorage.php',
     'OCP\\Files\\Storage\\IStorageFactory' => $baseDir . '/lib/public/Files/Storage/IStorageFactory.php',

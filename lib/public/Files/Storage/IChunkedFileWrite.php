@@ -29,7 +29,7 @@ namespace OCP\Files\Storage;
 use OCP\Files\GenericFileException;
 
 /**
- * @since 22.0.0
+ * @since 23.0.0
  */
 interface IChunkedFileWrite extends IStorage {
 
@@ -37,7 +37,7 @@ interface IChunkedFileWrite extends IStorage {
 	 * @param string $targetPath Relative target path in the storage
 	 * @return string writeToken to be used with the other methods to uniquely identify the file write operation
 	 * @throws GenericFileException
-	 * @since 22.0.0
+	 * @since 23.0.0
 	 */
 	public function beginChunkedFile(string $targetPath): string;
 
@@ -48,7 +48,7 @@ interface IChunkedFileWrite extends IStorage {
 	 * @param resource $data
 	 * @param int|null $size
 	 * @throws GenericFileException
-	 * @since 22.0.0
+	 * @since 23.0.0
 	 */
 	public function putChunkedFilePart(string $targetPath, string $writeToken, string $chunkId, $data, int $size = null): void;
 
@@ -57,7 +57,7 @@ interface IChunkedFileWrite extends IStorage {
 	 * @param string $writeToken
 	 * @return int
 	 * @throws GenericFileException
-	 * @since 22.0.0
+	 * @since 23.0.0
 	 */
 	public function writeChunkedFile(string $targetPath, string $writeToken): int;
 
@@ -65,7 +65,7 @@ interface IChunkedFileWrite extends IStorage {
 	 * @param string $targetPath
 	 * @param string $writeToken
 	 * @throws GenericFileException
-	 * @since 22.0.0
+	 * @since 23.0.0
 	 */
 	public function cancelChunkedFile(string $targetPath, string $writeToken): void;
 }

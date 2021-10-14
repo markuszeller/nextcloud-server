@@ -29,7 +29,9 @@ use OC\Files\ObjectStore\ObjectStoreStorage;
 use OC\Files\View;
 use OCA\DAV\Connector\Sabre\Directory;
 use OCA\DAV\Connector\Sabre\FilesPlugin;
+use OCP\Files\ObjectStore\IObjectStoreMultiPartUpload;
 use OCP\Files\Storage\IChunkedFileWrite;
+use OCP\Files\Storage\IProcessingCallbackStorage;
 use OCP\Files\Storage\IStorage;
 use OCP\Files\StorageInvalidException;
 use Sabre\DAV\Exception\BadRequest;
@@ -118,6 +120,10 @@ class ChunkingV2Plugin extends ServerPlugin {
 
 	public function beforePut(RequestInterface $request, ResponseInterface $response): bool {
 		$this->uploadFolder = $this->server->tree->getNodeForPath(dirname($request->getPath()));
+		if (!$this->uploadFolder instanceof UploadFolder) {
+			return true;
+		}
+
 		try {
 			$this->checkPrerequisites();
 			$storage = $this->getStorage();
@@ -143,7 +149,7 @@ class ChunkingV2Plugin extends ServerPlugin {
 
 		$additionalSize = (int)$request->getHeader('Content-Length');
 		if ($this->uploadFolder->childExists(self::TEMP_TARGET)) {
-			// FIXME Quota checking will not work for existing files that way
+			/** @var UploadFile $tempTargetFile */
 			$tempTargetFile = $this->uploadFolder->getChild(self::TEMP_TARGET);
 			$tempTargetCache = $storage->getCache()->get($tempTargetFile->getInternalPath());
 
@@ -159,7 +165,6 @@ class ChunkingV2Plugin extends ServerPlugin {
 
 		$stream = $request->getBodyAsStream();
 		$storage->putChunkedFilePart($targetFile->getInternalPath(), $uploadId, (string)$partId, $stream, $additionalSize);
-		// FIXME add return value to putChunkedFilePart to validate against size
 
 		$storage->getCache()->update($cacheEntry->getId(), ['size' => $cacheEntry->getSize() + $additionalSize]);
 		if ($tempTargetFile) {
@@ -211,6 +216,22 @@ class ChunkingV2Plugin extends ServerPlugin {
 
 		$rootView = new View();
 		if ($storage->instanceOfStorage(ObjectStoreStorage::class)) {
+			/** @var ObjectStoreStorage $storage */
+			$objectStore = $storage->getObjectStore();
+			if ($objectStore instanceof IObjectStoreMultiPartUpload) {
+				$parts = $objectStore->getMultipartUploads($storage->getURN($targetFile->getId()), $uploadId);
+				$size = 0;
+				foreach ($parts as $part) {
+					$size += $part['Size'];
+				}
+				$free = $storage->free_space($destinationParent->getInternalPath());
+				if ($free >= 0 && ($size > $free)) {
+					throw new InsufficientStorage("Insufficient space in $targetPath");
+				}
+			}
+		}
+		if ($storage->instanceOfStorage(IProcessingCallbackStorage::class)) {
+			/** @var IProcessingCallbackStorage $storage */
 			$lastTick = time();
 			$storage->processingCallback('writeChunkedFile', function () use ($lastTick) {
 				if ($lastTick < time()) {
@@ -245,7 +266,7 @@ class ChunkingV2Plugin extends ServerPlugin {
 				['200' => [
 					FilesPlugin::SIZE_PROPERTYNAME => $rootView->filesize($destinationInView)
 				]],
-				$destinationExists ? 204 : 201
+				$destinationExists ? '204' : '201'
 			);
 			echo $this->server->xml->write(
 				'{DAV:}multistatus',

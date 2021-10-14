@@ -45,6 +45,10 @@ class UploadFile implements IFile {
 		return $this->file->get();
 	}
 
+	public function getId() {
+		return $this->file->getId();
+	}
+
 	public function getContentType() {
 		return $this->file->getContentType();
 	}

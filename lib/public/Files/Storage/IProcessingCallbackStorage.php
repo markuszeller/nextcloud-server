@@ -1,5 +1,8 @@
 <?php
-/*
+
+declare(strict_types=1);
+
+/**
  * @copyright Copyright (c) 2021 Julius Härtl <jus@bitgrid.net>
  *
  * @author Julius Härtl <jus@bitgrid.net>
@@ -20,40 +23,24 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
+namespace OCP\Files\Storage;
 
-declare(strict_types=1);
-
-
-namespace OCP\Files\ObjectStore;
-
-use Aws\Result;
+use OCP\Files\GenericFileException;
 
 /**
+ * Interface that adds the ability to register processing callbacks for storage operation
+ *
  * @since 23.0.0
  */
-interface IObjectStoreMultiPartUpload {
+interface IProcessingCallbackStorage extends IStorage {
 	/**
+	 * Register a callback for a processing storage operation
+	 *
+	 * @param string $method
+	 * @param callable $callback being called regularly during the storage operation
+	 * @return void
+	 * @throws GenericFileException
 	 * @since 23.0.0
 	 */
-	public function initiateMultipartUpload(string $urn): string;
-
-	/**
-	 * @since 23.0.0
-	 */
-	public function uploadMultipartPart(string $urn, string $uploadId, int $partId, $stream, $size): Result;
-
-	/**
-	 * @since 23.0.0
-	 */
-	public function completeMultipartUpload(string $urn, string $uploadId, array $result): int;
-
-	/**
-	 * @since 23.0.0
-	 */
-	public function abortMultipartUpload(string $urn, string $uploadId): void;
-
-	/**
-	 * @since 23.0.0
-	 */
-	public function getMultipartUploads(string $urn, string $uploadId): array;
+	public function processingCallback(string $method, callable $callback): void;
 }

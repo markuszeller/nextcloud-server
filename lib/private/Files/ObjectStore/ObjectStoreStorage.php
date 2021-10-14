@@ -46,10 +46,11 @@ use OCP\Files\NotFoundException;
 use OCP\Files\ObjectStore\IObjectStore;
 use OCP\Files\ObjectStore\IObjectStoreMultiPartUpload;
 use OCP\Files\Storage\IChunkedFileWrite;
+use OCP\Files\Storage\IProcessingCallbackStorage;
 use OCP\Files\Storage\IStorage;
 use OCP\ICache;
 
-class ObjectStoreStorage extends \OC\Files\Storage\Common implements IChunkedFileWrite {
+class ObjectStoreStorage extends \OC\Files\Storage\Common implements IChunkedFileWrite, IProcessingCallbackStorage {
 	use CopyDirectory;
 
 	/**
@@ -666,7 +667,7 @@ class ObjectStoreStorage extends \OC\Files\Storage\Common implements IChunkedFil
 		$this->uploadCache->set($this->getUploadCacheKey($urn, $uploadId, 'parts'), $parts);
 	}
 
-	public function processingCallback(string $method, callable $callback) {
+	public function processingCallback(string $method, callable $callback): void {
 		if (in_array($method, ['writeChunkedFile'])) {
 			if (!isset($this->processingCallbacks[$method])) {
 				$this->processingCallbacks[$method] = [];
