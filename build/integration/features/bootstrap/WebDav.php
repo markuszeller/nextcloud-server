@@ -687,6 +687,59 @@ trait WebDav {
 		}
 	}
 
+
+	/**
+	 * @Given user :user creates a new chunking v2 upload with id :id and destionation :targetDestination
+	 */
+	public function userCreatesANewChunkingv2UploadWithIdAndDestination($user, $id, $targetDestination) {
+		$destination = '/uploads/' . $user . '/' . $id;
+		$this->makeDavRequest($user, 'MKCOL', $destination, [
+			'X-S3-Multipart-Destination' => $this->s3MultipartDestination,
+		], null, "uploads");
+	}
+
+	/**
+	 * @Given user :user uploads new chunk v2 file :num with :data to id :id and destionation :targetDestination
+	 */
+	public function userUploadsNewChunkv2FileOfWithToIdAndDestination($user, $num, $data, $id, $targetDestination) {
+		$data = \GuzzleHttp\Psr7\stream_for($data);
+		$destination = '/uploads/' . $user . '/' . $id . '/' . $num;
+		$this->makeDavRequest($user, 'PUT', $destination, [
+			'X-S3-Multipart-Destination' => $this->s3MultipartDestination
+		], $data, "uploads");
+	}
+
+	/**
+	 * @Given user :user moves new chunk v2 file with id :id to :dest
+	 */
+	public function userMovesNewChunkv2FileWithIdToMychunkedfileAndDestination($user, $id) {
+		$source = '/uploads/' . $user . '/' . $this->getUploadId($id) . '/.file';
+		try {
+			$this->makeDavRequest($user, 'MOVE', $source, [
+				'Destination' => $this->s3MultipartDestination,
+				'X-S3-Multipart-Destination' => $this->s3MultipartDestination,
+			], null, "uploads");
+		} catch (\GuzzleHttp\Exception\ServerException $e) {
+			// 5xx responses cause a server exception
+			$this->response = $e->getResponse();
+		} catch (\GuzzleHttp\Exception\ClientException $e) {
+			// 4xx responses cause a client exception
+			$this->response = $e->getResponse();
+		}
+	}
+
+	private function getTargetDestination(string $user, string $destination): string {
+		return substr($this->baseUrl, 0, -4) . $this->getDavFilesPath($user) . $destination;
+	}
+
+	private function getUploadId(string $id): string {
+		return $id . '-' . $this->uploadId;
+	}
+
+	private function newUploadId() {
+		$this->uploadId = (string)time();
+	}
+
 	/**
 	 * @Given /^Downloading file "([^"]*)" as "([^"]*)"$/
 	 */
@@ -874,5 +927,29 @@ trait WebDav {
 	public function userChecksFileIdForPath($user, $path) {
 		$currentFileID = $this->getFileIdForPath($user, $path);
 		Assert::assertEquals($currentFileID, $this->storedFileID);
+	}
+
+	/**
+	 * @Given /^user "([^"]*)" creates a file locally with "([^"]*)" x 5 MB chunks$/
+	 */
+	public function userCreatesAFileLocallyWithChunks($arg1, $chunks) {
+		$this->parts = [];
+		for ($i=0;$i<(int)$chunks;$i++) {
+			$randomletter = substr(str_shuffle("abcdefghijklmnopqrstuvwxyz"), 0, 1);
+			file_put_contents('/tmp/part-upload-' . $i, str_repeat($randomletter, 5 * 1024 * 1024));
+			$this->parts[] = '/tmp/part-upload-' . $i;
+		}
+
+	}
+
+	/**
+	 * @Then /^Downloaded content should be the created file$/
+	 */
+	public function downloadedContentShouldBeTheCreatedFile() {
+		$content = '';
+		foreach ($this->parts as $part) {
+			$content .= file_get_contents($part);
+		}
+		Assert::assertEquals($content, (string)$this->response->getBody());
 	}
 }
