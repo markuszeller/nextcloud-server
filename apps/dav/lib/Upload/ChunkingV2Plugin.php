@@ -198,6 +198,17 @@ class ChunkingV2Plugin extends ServerPlugin {
 		$this->server->httpResponse->setStatus(207);
 		$this->server->httpResponse->setHeader('Content-Type', 'application/xml; charset=utf-8');
 
+		// allow sync clients to send the modification and creation time along in a header
+		$updateFileInfo = [];
+		if ($this->server->httpRequest->getHeader('X-OC-MTime') !== null) {
+			$updateFileInfo['mtime'] = $this->sanitizeMtime($this->server->httpRequest->getHeader('X-OC-MTime'));
+			$this->server->httpResponse->setHeader('X-OC-MTime', 'accepted');
+		}
+		if ($this->server->httpRequest->getHeader('X-OC-CTime') !== null) {
+			$updateFileInfo['creation_time'] = $this->sanitizeMtime($this->server->httpRequest->getHeader('X-OC-CTime'));
+			$this->server->httpResponse->setHeader('X-OC-CTime', 'accepted');
+		}
+
 		$rootView = new View();
 		if ($storage->instanceOfStorage(ObjectStoreStorage::class)) {
 			$lastTick = time();
@@ -211,12 +222,14 @@ class ChunkingV2Plugin extends ServerPlugin {
 			});
 		}
 
-		$this->server->httpResponse->setBody(function () use ($targetFile, $rootView, $uploadId, $destinationName, $destinationParent, $destinationExists, $sourcePath, $destination) {
+		$this->server->httpResponse->setBody(function () use ($targetFile, $rootView, $uploadId, $destinationName, $destinationParent, $destinationExists, $sourcePath, $destination, $updateFileInfo) {
 			$rootView->writeChunkedFile($targetFile->getAbsoluteInternalPath(), $uploadId);
 			$destinationInView = $destinationParent->getFileInfo()->getPath() . '/' . $destinationName;
 			if (!$destinationExists) {
 				$rootView->rename($targetFile->getAbsoluteInternalPath(), $destinationInView);
 			}
+
+			$rootView->putFileInfo($destinationInView, $updateFileInfo);
 
 			$sourceNode = $this->server->tree->getNodeForPath($sourcePath);
 			if ($sourceNode instanceof FutureFile) {
@@ -284,5 +297,13 @@ class ChunkingV2Plugin extends ServerPlugin {
 		}
 		/** @var IChunkedFileWrite $storage */
 		return $storage;
+	}
+
+	protected function sanitizeMtime($mtimeFromRequest) {
+		if (!is_numeric($mtimeFromRequest)) {
+			throw new \InvalidArgumentException('X-OC-MTime header must be an integer (unix timestamp).');
+		}
+
+		return (int)$mtimeFromRequest;
 	}
 }
