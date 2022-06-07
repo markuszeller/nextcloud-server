@@ -80,3 +80,9 @@ Feature: dav-v2
 		And As an "user0"
 		When User "user0" uploads file "data/textfile.txt" to "/testquota/asdf.txt"
 		Then the HTTP status code should be "201"
+
+	Scenario: moving a file new endpoint way
+		Given using new dav path
+		And As an "admin"
+		When Image search should work
+		Then the HTTP status code should be "200"
