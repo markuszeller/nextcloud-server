@@ -332,4 +332,5 @@ css += generateVariablesAliases(true)
 css += '}'
 
 // WRITE CSS
+fs.mkdir('dist', (err) => { return });
 fs.writeFileSync(path.join(__dirname, '../../dist', 'icons.css'), sass.compileString(css).css)
