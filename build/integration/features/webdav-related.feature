@@ -153,6 +153,7 @@ Feature: webdav-related
 		  |{DAV:}quota-available-bytes|
 		And the single response should contain a property "{DAV:}quota-available-bytes" with value "-3"
 
+	@failure-s3
 	Scenario: Retrieving folder quota when quota is set
 		Given using old dav path
 		And As an "admin"
@@ -162,6 +163,7 @@ Feature: webdav-related
 		  |{DAV:}quota-available-bytes|
 		And the single response should contain a property "{DAV:}quota-available-bytes" with value "10485421"
 
+	@failure-s3
 	Scenario: Retrieving folder quota of shared folder with quota when no quota is set for recipient
 		Given using old dav path
 		And As an "admin"
@@ -191,15 +193,16 @@ Feature: webdav-related
 		And As an "user1"
 		And user "user1" created a folder "/testquota"
 		And as "user1" creating a share with
-		  | path | testquota |
-		  | shareType | 0 |
-		  | permissions | 31 |
-		  | shareWith | user0 |
+			| path | testquota |
+			| shareType | 0 |
+			| permissions | 31 |
+			| shareWith | user0 |
 		And user "user0" accepts last share
 		And As an "user0"
 		When User "user0" uploads file "data/textfile.txt" to "/testquota/asdf.txt"
 		Then the HTTP status code should be "201"
 
+	@failure-s3
 	Scenario: Retrieving folder quota when quota is set and a file was uploaded
 		Given using old dav path
 		And As an "admin"
@@ -210,6 +213,7 @@ Feature: webdav-related
 		  |{DAV:}quota-available-bytes|
 		Then the single response should contain a property "{DAV:}quota-available-bytes" with value "592"
 
+	@failure-s3
 	Scenario: Retrieving folder quota when quota is set and a file was received
 		Given using old dav path
 		And As an "admin"
