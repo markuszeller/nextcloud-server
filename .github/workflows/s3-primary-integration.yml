@@ -65,9 +65,6 @@ jobs:
           cd build/integration
           bash run.sh --tags "~@failure-s3" features/webdav-related.feature
 
-      - name: PHPUnit
-        working-directory: tests
-        run: phpunit --configuration phpunit-autotest.xml --group DB,SLOWDB
       - name: S3 logs
         if: always()
         run: |
